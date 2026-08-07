@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/brown_mushroom_block_inventory",
+  "overrides": [
+    {
+      "predicate": { "custom_model_data": 1001 },
+      "model": "minecraft:block/maple_log"
+    }
+  ]
+}

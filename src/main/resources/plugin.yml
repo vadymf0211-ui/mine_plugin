@@ -1,0 +1,17 @@
+name: MapleBlocks
+version: '${project.version}'
+main: com.example.maple.MaplePlugin
+api-version: '1.21'
+description: Adds Maple Log and Maple Leaves custom blocks
+author: YourName
+
+commands:
+  maple:
+    description: Give maple blocks
+    usage: /maple give <log|leaves> [amount]
+    permission: mapleblocks.give
+
+permissions:
+  mapleblocks.give:
+    description: Allows giving maple items
+    default: op
