@@ -41,7 +41,7 @@ public final class MapleItems {
 
     /** Creates the Maple Leaves item ("Листва клёна"). */
     public ItemStack createMapleLeaves(int amount) {
-        return build(Material.RED_MUSHROOM_BLOCK, "Листва клёна", CMD_MAPLE_LEAVES, TYPE_LEAVES, amount);
+        return build(Material.CHORUS_PLANT, "Листва клёна", CMD_MAPLE_LEAVES, TYPE_LEAVES, amount);
     }
 
     private ItemStack build(Material material, String name, int customModelData, String type, int amount) {

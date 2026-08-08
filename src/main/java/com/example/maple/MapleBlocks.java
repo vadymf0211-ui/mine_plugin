@@ -15,22 +15,23 @@ import org.bukkit.block.data.type.NoteBlock;
  * Why not oak_log / oak_leaves directly: the reserved-BlockState method only
  * works with blocks that have UNREACHABLE states. oak_log has just 3 states
  * (axis=x/y/z) — all used by the game; oak_leaves has 28 states — all reachable
- * in survival (e.g. distance=7,persistent=false appears on every chopped tree
- * right before the leaves decay). There is nothing to reserve, so re-texturing
- * them would corrupt real oak blocks everywhere. Hence:
+ * in survival. There is nothing to reserve, so re-texturing them would corrupt
+ * real oak blocks everywhere. Hence:
  *
  *   Maple Log    -> note_block[instrument=didgeridoo, note=1]
  *                   (real wooden block: axe tool, wood sounds, hardness 0.8;
- *                    the state is unreachable because the plugin cancels
- *                    BlockPhysicsEvent for all note blocks — the instrument is
- *                    recalculated from the block below ONLY through physics
- *                    updates, so vanilla note blocks stay "harp" forever)
+ *                    unreachable because the plugin locks note block physics —
+ *                    a vanilla note block stays "harp" forever)
  *
- *   Maple Leaves -> red_mushroom_block[up=true,down=true,sides=false]
- *                   (non-interactable full block: placing against it works
- *                    natively; breaks fast like foliage, hardness 0.2; this
- *                    face combination never occurs in vanilla worldgen and a
- *                    player-placed mushroom block always has ALL faces=true)
+ *   Maple Leaves -> chorus_plant[north/south/east/west/up/down = false]
+ *                   (the only full-size vanilla block that renders with CUTOUT
+ *                    transparency and has spare states — transparent leaf
+ *                    textures work in the world, exactly like in the hand.
+ *                    The all-false "floating" state cannot exist in nature: an
+ *                    unsupported chorus plant instantly breaks, and connected
+ *                    natural chorus always has at least one face=true. The
+ *                    plugin cancels physics for this exact state only, so End
+ *                    chorus mechanics stay fully vanilla.)
  */
 public final class MapleBlocks {
 
@@ -65,18 +66,16 @@ public final class MapleBlocks {
         return noteBlock.getInstrument() == MAPLE_INSTRUMENT && noteBlock.getNote().equals(NOTE_LOG);
     }
 
-    // ---------------- Maple Leaves (red_mushroom_block) ----------------
+    // ---------------- Maple Leaves (chorus_plant) ----------------
 
-    private static final BlockFace[] TRUE_FACES = {BlockFace.UP, BlockFace.DOWN};
-    private static final BlockFace[] FALSE_FACES = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+    private static final BlockFace[] ALL_FACES = {
+            BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST, BlockFace.UP, BlockFace.DOWN
+    };
 
-    /** Creates the BlockData for the Maple Leaves (red_mushroom_block[up,down]). */
+    /** Creates the BlockData for the Maple Leaves (chorus_plant with no connections). */
     public static BlockData mapleLeavesData() {
-        MultipleFacing data = (MultipleFacing) Material.RED_MUSHROOM_BLOCK.createBlockData();
-        for (BlockFace face : TRUE_FACES) {
-            data.setFace(face, true);
-        }
-        for (BlockFace face : FALSE_FACES) {
+        MultipleFacing data = (MultipleFacing) Material.CHORUS_PLANT.createBlockData();
+        for (BlockFace face : ALL_FACES) {
             data.setFace(face, false);
         }
         return data;
@@ -84,18 +83,13 @@ public final class MapleBlocks {
 
     /** True if the block is our Maple Leaves. */
     public static boolean isMapleLeaves(Block block) {
-        if (block.getType() != Material.RED_MUSHROOM_BLOCK) {
+        if (block.getType() != Material.CHORUS_PLANT) {
             return false;
         }
         if (!(block.getBlockData() instanceof MultipleFacing facing)) {
             return false;
         }
-        for (BlockFace face : TRUE_FACES) {
-            if (!facing.hasFace(face)) {
-                return false;
-            }
-        }
-        for (BlockFace face : FALSE_FACES) {
+        for (BlockFace face : ALL_FACES) {
             if (facing.hasFace(face)) {
                 return false;
             }

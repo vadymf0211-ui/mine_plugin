@@ -1,0 +1,19 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 1002,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:block/maple_leaves"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:block/chorus_plant"
+    }
+  }
+}
