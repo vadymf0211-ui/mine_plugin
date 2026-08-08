@@ -1,0 +1,198 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "instrument": "didgeridoo",
+        "note": "1"
+      },
+      "apply": {
+        "model": "minecraft:block/maple_log"
+      }
+    },
+    {
+      "when": {
+        "instrument": "didgeridoo",
+        "note": "2"
+      },
+      "apply": {
+        "model": "minecraft:block/maple_leaves"
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "instrument": "harp"
+          },
+          {
+            "instrument": "basedrum"
+          },
+          {
+            "instrument": "snare"
+          },
+          {
+            "instrument": "hat"
+          },
+          {
+            "instrument": "bass"
+          },
+          {
+            "instrument": "flute"
+          },
+          {
+            "instrument": "bell"
+          },
+          {
+            "instrument": "guitar"
+          },
+          {
+            "instrument": "chime"
+          },
+          {
+            "instrument": "xylophone"
+          },
+          {
+            "instrument": "iron_xylophone"
+          },
+          {
+            "instrument": "cow_bell"
+          },
+          {
+            "instrument": "bit"
+          },
+          {
+            "instrument": "banjo"
+          },
+          {
+            "instrument": "pling"
+          },
+          {
+            "instrument": "zombie"
+          },
+          {
+            "instrument": "skeleton"
+          },
+          {
+            "instrument": "creeper"
+          },
+          {
+            "instrument": "dragon"
+          },
+          {
+            "instrument": "wither_skeleton"
+          },
+          {
+            "instrument": "piglin"
+          },
+          {
+            "instrument": "custom_head"
+          }
+        ]
+      },
+      "apply": {
+        "model": "minecraft:block/note_block"
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "instrument": "didgeridoo",
+            "note": "0"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "3"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "4"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "5"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "6"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "7"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "8"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "9"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "10"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "11"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "12"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "13"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "14"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "15"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "16"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "17"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "18"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "19"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "20"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "21"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "22"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "23"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "24"
+          }
+        ]
+      },
+      "apply": {
+        "model": "minecraft:block/note_block"
+      }
+    }
+  ]
+}

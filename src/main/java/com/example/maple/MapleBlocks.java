@@ -1,74 +1,83 @@
 package com.example.maple;
 
+import org.bukkit.Instrument;
 import org.bukkit.Material;
+import org.bukkit.Note;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.MultipleFacing;
+import org.bukkit.block.data.type.NoteBlock;
 
 /**
  * BlockState definitions and detection for the custom Maple blocks.
  *
- * The "magic" state used for both blocks:
- *   up = true, down = true, north = false, south = false, east = false, west = false
+ * Base block: NOTE_BLOCK — a real wooden block:
+ *  - mined correctly with an axe (proper tool),
+ *  - vanilla wood sounds out of the box,
+ *  - wood-like hardness (0.8),
+ *  - a huge state space (instrument × note × powered = 1150 states) to reserve from.
  *
- * - never produced by vanilla worldgen (huge mushroom caps/stems),
- * - never produced by player placement (players always place all-true mushroom blocks),
- * so it is safe to claim it for our custom blocks.
+ * Reserved states:
+ *   Maple Log    -> note_block[instrument=didgeridoo, note=1]
+ *   Maple Leaves -> note_block[instrument=didgeridoo, note=2]
+ *
+ * These states are unreachable in survival because the plugin cancels
+ * BlockPhysicsEvent for all note blocks (the instrument is recalculated from
+ * the block below ONLY through physics updates, so vanilla note blocks stay
+ * "harp" forever and can never become "didgeridoo").
  */
 public final class MapleBlocks {
 
     private MapleBlocks() {
     }
 
-    private static final BlockFace[] TRUE_FACES = {BlockFace.UP, BlockFace.DOWN};
-    private static final BlockFace[] FALSE_FACES = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+    /** The reserved instrument. Unreachable while note block physics is locked. */
+    public static final Instrument MAPLE_INSTRUMENT = Instrument.DIDGERIDOO;
 
-    /** Creates the BlockData for the Maple Log (brown_mushroom_block[up,down]). */
+    /** note=1 -> Maple Log. */
+    public static final Note NOTE_LOG = new Note(1);
+    /** note=2 -> Maple Leaves. */
+    public static final Note NOTE_LEAVES = new Note(2);
+
+    /** Creates the BlockData for the Maple Log (note_block[instrument=didgeridoo,note=1]). */
     public static BlockData mapleLogData() {
-        return createData(Material.BROWN_MUSHROOM_BLOCK);
+        return createData(NOTE_LOG);
     }
 
-    /** Creates the BlockData for the Maple Leaves (red_mushroom_block[up,down]). */
+    /** Creates the BlockData for the Maple Leaves (note_block[instrument=didgeridoo,note=2]). */
     public static BlockData mapleLeavesData() {
-        return createData(Material.RED_MUSHROOM_BLOCK);
+        return createData(NOTE_LEAVES);
     }
 
-    private static BlockData createData(Material material) {
-        MultipleFacing data = (MultipleFacing) material.createBlockData();
-        for (BlockFace face : TRUE_FACES) {
-            data.setFace(face, true);
-        }
-        for (BlockFace face : FALSE_FACES) {
-            data.setFace(face, false);
-        }
+    private static BlockData createData(Note note) {
+        NoteBlock data = (NoteBlock) Material.NOTE_BLOCK.createBlockData();
+        data.setInstrument(MAPLE_INSTRUMENT);
+        data.setNote(note);
+        data.setPowered(false);
         return data;
     }
 
     /** True if the block is our Maple Log. */
     public static boolean isMapleLog(Block block) {
-        return block.getType() == Material.BROWN_MUSHROOM_BLOCK && hasMapleState(block);
+        return matches(block, NOTE_LOG);
     }
 
     /** True if the block is our Maple Leaves. */
     public static boolean isMapleLeaves(Block block) {
-        return block.getType() == Material.RED_MUSHROOM_BLOCK && hasMapleState(block);
+        return matches(block, NOTE_LEAVES);
     }
 
-    private static boolean hasMapleState(Block block) {
-        if (!(block.getBlockData() instanceof MultipleFacing facing)) {
+    /** True if the block is any of our custom blocks. */
+    public static boolean isMapleBlock(Block block) {
+        return isMapleLog(block) || isMapleLeaves(block);
+    }
+
+    private static boolean matches(Block block, Note note) {
+        if (block.getType() != Material.NOTE_BLOCK) {
             return false;
         }
-        for (BlockFace face : TRUE_FACES) {
-            if (!facing.hasFace(face)) {
-                return false;
-            }
+        if (!(block.getBlockData() instanceof NoteBlock noteBlock)) {
+            return false;
         }
-        for (BlockFace face : FALSE_FACES) {
-            if (facing.hasFace(face)) {
-                return false;
-            }
-        }
-        return true;
+        return noteBlock.getInstrument() == MAPLE_INSTRUMENT && noteBlock.getNote().equals(note);
     }
 }

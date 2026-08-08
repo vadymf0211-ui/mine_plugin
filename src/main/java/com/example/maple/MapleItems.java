@@ -10,7 +10,7 @@ import org.bukkit.persistence.PersistentDataType;
 /**
  * Factory + identification for the custom Maple items.
  *
- * Items are plain vanilla mushroom-block ItemStacks with:
+ * Items are plain vanilla NOTE_BLOCK ItemStacks with:
  *  - a CustomModelData value (used ONLY by the resource pack to swap the model),
  *  - a PersistentDataContainer tag (used by the plugin to identify the item —
  *    reliable even if another pack/plugin reuses the same CustomModelData),
@@ -36,16 +36,16 @@ public final class MapleItems {
 
     /** Creates the Maple Log item ("Клён"). */
     public ItemStack createMapleLog(int amount) {
-        return build(Material.BROWN_MUSHROOM_BLOCK, "Клён", CMD_MAPLE_LOG, TYPE_LOG, amount);
+        return build("Клён", CMD_MAPLE_LOG, TYPE_LOG, amount);
     }
 
     /** Creates the Maple Leaves item ("Листва клёна"). */
     public ItemStack createMapleLeaves(int amount) {
-        return build(Material.RED_MUSHROOM_BLOCK, "Листва клёна", CMD_MAPLE_LEAVES, TYPE_LEAVES, amount);
+        return build("Листва клёна", CMD_MAPLE_LEAVES, TYPE_LEAVES, amount);
     }
 
-    private ItemStack build(Material material, String name, int customModelData, String type, int amount) {
-        ItemStack stack = new ItemStack(material, Math.max(1, amount));
+    private ItemStack build(String name, int customModelData, String type, int amount) {
+        ItemStack stack = new ItemStack(Material.NOTE_BLOCK, Math.max(1, amount));
         ItemMeta meta = stack.getItemMeta();
 
         // Vanilla-looking name: white, non-italic, no lore.

@@ -6,15 +6,15 @@ import org.bukkit.plugin.java.JavaPlugin;
 /**
  * MapleBlocks — adds Maple Log and Maple Leaves as "clean" custom blocks.
  *
- * Implementation: unused vanilla BlockStates.
- *  - Maple Log    -> BROWN_MUSHROOM_BLOCK  [up=true, down=true, north/south/east/west=false]
- *  - Maple Leaves -> RED_MUSHROOM_BLOCK    [up=true, down=true, north/south/east/west=false]
+ * Implementation: reserved vanilla NOTE_BLOCK states (a real wooden block —
+ * proper axe tool, vanilla wood sounds, wood-like hardness).
+ *  - Maple Log    -> note_block[instrument=didgeridoo, note=1]
+ *  - Maple Leaves -> note_block[instrument=didgeridoo, note=2]
  *
- * These face combinations never occur in vanilla worldgen (huge mushroom caps
- * never have down=true with all sides false) and never occur from player
- * placement (a player-placed mushroom block has ALL faces = true), so the
- * resource pack can safely re-texture exactly these states without touching
- * the vanilla look of real mushroom blocks.
+ * The plugin cancels physics updates for all note blocks, so a vanilla note
+ * block can never change its instrument from the default "harp" — which makes
+ * the reserved "didgeridoo" states unreachable in survival and safe for the
+ * resource pack to re-texture without touching real note blocks.
  */
 public final class MaplePlugin extends JavaPlugin {
 
