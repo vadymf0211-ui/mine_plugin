@@ -1,0 +1,47 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "persistent": "true",
+        "distance": "7",
+        "waterlogged": "false"
+      },
+      "apply": {
+        "model": "minecraft:block/maple_leaves"
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "persistent": "false"
+          },
+          {
+            "waterlogged": "true"
+          },
+          {
+            "distance": "1"
+          },
+          {
+            "distance": "2"
+          },
+          {
+            "distance": "3"
+          },
+          {
+            "distance": "4"
+          },
+          {
+            "distance": "5"
+          },
+          {
+            "distance": "6"
+          }
+        ]
+      },
+      "apply": {
+        "model": "minecraft:block/azalea_leaves"
+      }
+    }
+  ]
+}

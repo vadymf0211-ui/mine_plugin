@@ -4,34 +4,32 @@ import org.bukkit.Instrument;
 import org.bukkit.Material;
 import org.bukkit.Note;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.MultipleFacing;
+import org.bukkit.block.data.type.Leaves;
 import org.bukkit.block.data.type.NoteBlock;
 
 /**
  * BlockState definitions and detection for the custom Maple blocks.
- *
- * Why not oak_log / oak_leaves directly: the reserved-BlockState method only
- * works with blocks that have UNREACHABLE states. oak_log has just 3 states
- * (axis=x/y/z) — all used by the game; oak_leaves has 28 states — all reachable
- * in survival. There is nothing to reserve, so re-texturing them would corrupt
- * real oak blocks everywhere. Hence:
  *
  *   Maple Log    -> note_block[instrument=didgeridoo, note=1]
  *                   (real wooden block: axe tool, wood sounds, hardness 0.8;
  *                    unreachable because the plugin locks note block physics —
  *                    a vanilla note block stays "harp" forever)
  *
- *   Maple Leaves -> chorus_plant[north/south/east/west/up/down = false]
- *                   (the only full-size vanilla block that renders with CUTOUT
- *                    transparency and has spare states — transparent leaf
- *                    textures work in the world, exactly like in the hand.
- *                    The all-false "floating" state cannot exist in nature: an
- *                    unsupported chorus plant instantly breaks, and connected
- *                    natural chorus always has at least one face=true. The
- *                    plugin cancels physics for this exact state only, so End
- *                    chorus mechanics stay fully vanilla.)
+ *   Maple Leaves -> azalea_leaves[distance=7, persistent=true, waterlogged=false]
+ *                   (REAL leaves: full hitbox, cutout transparency, native leaf
+ *                    sounds, floats without support, correct breaking speed.
+ *                    Why this state is safe to reserve:
+ *                     * worldgen / grown azalea leaves are persistent=false —
+ *                       including the transient distance=7 "about to decay"
+ *                       state of chopped trees — so they never match;
+ *                     * a PLAYER placing vanilla azalea leaves far from logs
+ *                       would produce persistent=true+distance=7, but the
+ *                       distance property has NO visual effect on vanilla
+ *                       leaves, so the plugin silently rewrites such
+ *                       placements to distance=6 — identical look, no clash;
+ *                     * waterlogged=false is pinned by cancelling bucket use
+ *                       on our blocks.)
  */
 public final class MapleBlocks {
 
@@ -66,35 +64,42 @@ public final class MapleBlocks {
         return noteBlock.getInstrument() == MAPLE_INSTRUMENT && noteBlock.getNote().equals(NOTE_LOG);
     }
 
-    // ---------------- Maple Leaves (chorus_plant) ----------------
+    // ---------------- Maple Leaves (azalea_leaves) ----------------
 
-    private static final BlockFace[] ALL_FACES = {
-            BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST, BlockFace.UP, BlockFace.DOWN
-    };
+    /** The reserved leaf distance. */
+    public static final int LEAVES_DISTANCE = 7;
 
-    /** Creates the BlockData for the Maple Leaves (chorus_plant with no connections). */
+    /** Creates the BlockData for the Maple Leaves. */
     public static BlockData mapleLeavesData() {
-        MultipleFacing data = (MultipleFacing) Material.CHORUS_PLANT.createBlockData();
-        for (BlockFace face : ALL_FACES) {
-            data.setFace(face, false);
-        }
+        Leaves data = (Leaves) Material.AZALEA_LEAVES.createBlockData();
+        data.setDistance(LEAVES_DISTANCE);
+        data.setPersistent(true);
+        data.setWaterlogged(false);
+        return data;
+    }
+
+    /**
+     * The "escape" state for VANILLA azalea leaves that a player legitimately
+     * placed far from logs (persistent=true, distance=7): visually identical,
+     * decay-immune, but out of our reserved state.
+     */
+    public static BlockData vanillaEscapeLeavesData() {
+        Leaves data = (Leaves) Material.AZALEA_LEAVES.createBlockData();
+        data.setDistance(LEAVES_DISTANCE - 1);
+        data.setPersistent(true);
+        data.setWaterlogged(false);
         return data;
     }
 
     /** True if the block is our Maple Leaves. */
     public static boolean isMapleLeaves(Block block) {
-        if (block.getType() != Material.CHORUS_PLANT) {
+        if (block.getType() != Material.AZALEA_LEAVES) {
             return false;
         }
-        if (!(block.getBlockData() instanceof MultipleFacing facing)) {
+        if (!(block.getBlockData() instanceof Leaves leaves)) {
             return false;
         }
-        for (BlockFace face : ALL_FACES) {
-            if (facing.hasFace(face)) {
-                return false;
-            }
-        }
-        return true;
+        return leaves.isPersistent() && !leaves.isWaterlogged() && leaves.getDistance() == LEAVES_DISTANCE;
     }
 
     /** True if the block is any of our custom blocks. */
