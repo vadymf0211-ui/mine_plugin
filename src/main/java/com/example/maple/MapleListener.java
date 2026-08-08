@@ -3,7 +3,6 @@ package com.example.maple;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -18,19 +17,24 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.LeavesDecayEvent;
 import org.bukkit.event.block.NotePlayEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Handles the full lifecycle of the Maple blocks.
@@ -38,28 +42,27 @@ import java.util.List;
  *  Maple Log    = note_block[instrument=didgeridoo, note=1]
  *  Maple Leaves = azalea_leaves[distance=7, persistent=true, waterlogged=false]
  *
- *  PLACE   — both items place through the vanilla path (leaves place anywhere,
- *            like real leaves) and are swapped to the reserved state right after.
- *            If a player places a VANILLA azalea leaves block that would land in
- *            our reserved state (persistent leaves far from logs -> distance=7),
- *            it is rewritten to distance=6 — visually identical for vanilla
- *            leaves, so nothing changes for the player, but no collision.
- *  STACKING FIX — the vanilla client refuses to place a block against a note
- *            block without sneaking (right click = "tune the note"), so the
- *            plugin performs THAT placement server-side.
- *  BREAK   — cancels vanilla drops, drops the correct custom item, respects the
- *            tool (log: always drops, axe is just faster; leaves: shears only).
- *            Sounds are native: note block = wood, azalea leaves = leaves.
- *  DECAY   — our leaves are persistent so they never decay or need support;
- *            LeavesDecayEvent is cancelled for them as a safety net.
- *  WATERLOG — bucket use on our leaves is cancelled (waterlogged=true would
- *            knock the block out of the reserved state).
- *  STATE PROTECTION — physics is cancelled for all note blocks (keeps the
- *            reserved instrument unreachable) and for azalea leaves in OUR
- *            exact state (stops distance recalculation). Around every
- *            place/break/explosion, maple neighbours are re-asserted next tick
- *            and re-SENT to nearby clients (client-side prediction can display
- *            a stale state even when the server never changed anything).
+ * STATE PROTECTION — the critical part. Minecraft recalculates a note block's
+ * INSTRUMENT (from the blocks below/above) and a leaf's DISTANCE on every
+ * neighbour update, and Paper only guarantees a BlockPhysicsEvent for the ROOT
+ * block of an update — the neighbours are often recalculated silently. So:
+ *
+ *   1) physics is cancelled for all note blocks and for azalea leaves in our
+ *      exact state — this covers updates addressed to the block itself;
+ *   2) EVERY root physics event additionally schedules a next-tick
+ *      re-assertion of any maple blocks adjacent to the root — this covers the
+ *      silent neighbour recalculations (placing/breaking blocks next to a
+ *      maple log, flowing water, falling sand, pistons firing, etc.);
+ *   3) place/break/explosion handlers also protect the surrounding area
+ *      explicitly (covers operations that skip physics entirely);
+ *   4) re-asserted states are re-SENT to nearby clients, because client-side
+ *      prediction can display a stale state that the server never broadcast;
+ *   5) pistons are prevented from moving maple blocks (a move would scramble
+ *      the reserved state on landing);
+ *   6) growing trees are prevented from overwriting maple blocks.
+ *
+ * A per-tick dedup set keeps the re-assertion queue from ballooning during
+ * update storms (water flows, big explosions).
  */
 public final class MapleListener implements Listener {
 
@@ -72,6 +75,9 @@ public final class MapleListener implements Listener {
 
     private final MaplePlugin plugin;
     private final MapleItems items;
+
+    /** Locations already queued for re-assertion this tick (dedup). */
+    private final Set<Location> pendingReassert = new HashSet<>();
 
     public MapleListener(MaplePlugin plugin, MapleItems items) {
         this.plugin = plugin;
@@ -94,6 +100,9 @@ public final class MapleListener implements Listener {
             if (block.getType() == Material.AZALEA_LEAVES && MapleBlocks.isMapleLeaves(block)) {
                 block.setBlockData(MapleBlocks.vanillaEscapeLeavesData(), false);
             }
+            // Placing ANY block can silently retune/reconnect adjacent maple
+            // blocks — protect them.
+            protectNeighbours(block);
             return;
         }
 
@@ -113,10 +122,14 @@ public final class MapleListener implements Listener {
     // ------------------------------------------------------------------
 
     /**
-     * Note blocks: cancel for ALL of them — the instrument must never change,
-     * otherwise the reserved "didgeridoo" state becomes reachable in survival.
-     * Azalea leaves: cancel ONLY for our exact state, so natural leaves keep
-     * their vanilla distance/decay behaviour everywhere else.
+     * Root physics handler.
+     *
+     * For our own blocks the event is cancelled outright. For every OTHER root
+     * update we schedule a re-assertion of adjacent maple blocks: Paper fires
+     * this event only for the root of an update chain, and the neighbours
+     * (whose instrument/distance the engine recalculates in the same pass) get
+     * no event of their own — that was exactly the "log turns into a note
+     * block when you build next to it" bug.
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPhysics(BlockPhysicsEvent event) {
@@ -124,9 +137,14 @@ public final class MapleListener implements Listener {
         Material type = block.getType();
         if (type == Material.NOTE_BLOCK) {
             event.setCancelled(true);
-        } else if (type == Material.AZALEA_LEAVES && MapleBlocks.isMapleLeaves(block)) {
-            event.setCancelled(true);
+            return;
         }
+        if (type == Material.AZALEA_LEAVES && MapleBlocks.isMapleLeaves(block)) {
+            event.setCancelled(true);
+            return;
+        }
+        // Root update of a foreign block: shield its maple neighbours.
+        protectNeighbours(block);
     }
 
     /** Safety net: our leaves are persistent and must never decay. */
@@ -158,6 +176,36 @@ public final class MapleListener implements Listener {
         }
     }
 
+    /**
+     * Pistons must not move maple blocks: the vanilla move recomputes the
+     * landing state with no event we could veto, scrambling the reserved state.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPistonExtend(BlockPistonExtendEvent event) {
+        for (Block block : event.getBlocks()) {
+            if (MapleBlocks.isMapleBlock(block)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPistonRetract(BlockPistonRetractEvent event) {
+        for (Block block : event.getBlocks()) {
+            if (MapleBlocks.isMapleBlock(block)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    /** Growing trees must not overwrite maple blocks (vanilla trees can replace leaves). */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onStructureGrow(StructureGrowEvent event) {
+        event.getBlocks().removeIf(state -> MapleBlocks.isMapleBlock(state.getBlock()));
+    }
+
     private void protectArea(Block center) {
         List<Saved> saved = new ArrayList<>();
         collect(center, saved);
@@ -176,6 +224,7 @@ public final class MapleListener implements Listener {
     }
 
     private void collect(Block block, List<Saved> out) {
+        // Cheap Material pre-check happens inside the isMaple* methods.
         if (MapleBlocks.isMapleLog(block)) {
             out.add(new Saved(block, MapleItems.TYPE_LOG));
         } else if (MapleBlocks.isMapleLeaves(block)) {
@@ -185,17 +234,28 @@ public final class MapleListener implements Listener {
 
     /**
      * Next tick: restore the server-side state if vanilla managed to change it,
-     * and ALWAYS re-send the canonical state to nearby clients — their local
-     * prediction may display a stale shape even though the server state never
-     * changed (in which case no packet was broadcast).
+     * and re-send the canonical state to nearby clients — their local
+     * prediction may display a stale state even though the server never
+     * broadcast a change. Deduplicated per tick via {@link #pendingReassert}.
      */
     private void reassertNextTick(List<Saved> saved) {
         if (saved.isEmpty()) {
             return;
         }
+        List<Saved> fresh = new ArrayList<>(saved.size());
+        for (Saved s : saved) {
+            if (pendingReassert.add(s.block().getLocation())) {
+                fresh.add(s);
+            }
+        }
+        if (fresh.isEmpty()) {
+            return;
+        }
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            for (Saved s : saved) {
+            for (Saved s : fresh) {
                 Block b = s.block();
+                pendingReassert.remove(b.getLocation());
+
                 Material host = s.type().equals(MapleItems.TYPE_LOG) ? Material.NOTE_BLOCK : Material.AZALEA_LEAVES;
                 if (b.getType() != host) {
                     continue; // the block was legitimately removed meanwhile
@@ -338,7 +398,12 @@ public final class MapleListener implements Listener {
                 dropItem(block, items.createMapleLeaves(1));
             }
             protectNeighbours(block);
+            return;
         }
+
+        // Breaking ANY block can silently retune/reconnect adjacent maple
+        // blocks — protect them.
+        protectNeighbours(block);
     }
 
     // ------------------------------------------------------------------
@@ -356,22 +421,21 @@ public final class MapleListener implements Listener {
     }
 
     private void handleExplosion(List<Block> blockList) {
-        List<Block> touched = new ArrayList<>();
+        List<Block> touched = new ArrayList<>(blockList);
         Iterator<Block> iterator = blockList.iterator();
         while (iterator.hasNext()) {
             Block block = iterator.next();
             if (MapleBlocks.isMapleLog(block)) {
                 iterator.remove();
-                touched.add(block);
                 block.setType(Material.AIR, false);
                 dropItem(block, items.createMapleLog(1));
             } else if (MapleBlocks.isMapleLeaves(block)) {
                 // Vanilla leaves destroyed by an explosion drop nothing.
                 iterator.remove();
-                touched.add(block);
                 block.setType(Material.AIR, false);
             }
         }
+        // Protect maple blocks bordering ANY destroyed block.
         for (Block block : touched) {
             protectNeighbours(block);
         }
