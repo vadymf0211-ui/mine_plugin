@@ -21,10 +21,8 @@ import org.bukkit.inventory.ShapelessRecipe;
  *   4 logs (2x2)                                -> 3 maple wood
  *   4 stripped logs (2x2)                       -> 3 stripped maple wood
  *
- * VANILLA results (shaped blocks cannot exist as reserved-state custom blocks —
- * their geometry/collision is engine-side — so these recipes yield the SPRUCE
- * counterparts, the closest vanilla wood tone to maple; change SHAPED_WOOD to
- * another vanilla family if desired):
+ * WARPED-FAMILY TAKEOVER results (renamed vanilla warped blocks, re-textured
+ * to maple by the resource pack — full native mechanics incl. redstone):
  *   6 planks (two rows)      -> 4 stairs
  *   3 planks (row)           -> 6 slabs
  *   4 planks + 2 sticks      -> 3 fences
@@ -78,38 +76,44 @@ public final class MapleRecipes {
         shaped("chest_from_maple_planks", new ItemStack(Material.CHEST),
                 new String[]{"PPP", "P P", "PPP"}, 'P', planks, null, null);
 
-        // 6 planks (two rows of three... vanilla stairs shape) -> 4 stairs
-        shaped("stairs_from_maple_planks", new ItemStack(Material.SPRUCE_STAIRS, 4),
+        // ---------- warped-family takeover: shaped maple blocks ----------
+        // The resource pack re-textures the whole warped shaped family to
+        // maple (those blocks never generate in worldgen), so these are REAL
+        // vanilla blocks with 100% native mechanics — just renamed.
+
+        // 6 planks (stairs shape) -> 4 maple stairs
+        shaped("stairs_from_maple_planks", items.renamed(Material.WARPED_STAIRS, "Кленовые ступени", 4),
                 new String[]{"P  ", "PP ", "PPP"}, 'P', planks, null, null);
 
-        // 3 planks (row) -> 6 slabs
-        shaped("slab_from_maple_planks", new ItemStack(Material.SPRUCE_SLAB, 6),
+        // 3 planks (row) -> 6 maple slabs
+        shaped("slab_from_maple_planks", items.renamed(Material.WARPED_SLAB, "Кленовая плита", 6),
                 new String[]{"PPP"}, 'P', planks, null, null);
 
-        // 4 planks + 2 sticks -> 3 fences
-        shaped("fence_from_maple_planks", new ItemStack(Material.SPRUCE_FENCE, 3),
+        // 4 planks + 2 sticks -> 3 maple fences
+        shaped("fence_from_maple_planks", items.renamed(Material.WARPED_FENCE, "Кленовый забор", 3),
                 new String[]{"PSP", "PSP"}, 'P', planks, 'S', stick);
 
-        // 2 planks + 4 sticks -> 1 fence gate
-        shaped("fence_gate_from_maple_planks", new ItemStack(Material.SPRUCE_FENCE_GATE),
+        // 2 planks + 4 sticks -> 1 maple fence gate
+        shaped("fence_gate_from_maple_planks", items.renamed(Material.WARPED_FENCE_GATE, "Кленовая калитка", 1),
                 new String[]{"SPS", "SPS"}, 'P', planks, 'S', stick);
 
-        // 6 planks (2x3) -> 3 CUSTOM maple doors (warped_door[powered=true] host)
-        shaped("door_from_maple_planks", items.create(MapleType.DOOR, 3),
+        // 6 planks (2x3) -> 3 maple doors
+        shaped("door_from_maple_planks", items.renamed(Material.WARPED_DOOR, "Кленовая дверь", 3),
                 new String[]{"PP", "PP", "PP"}, 'P', planks, null, null);
 
-        // 6 planks (3x2) -> 2 CUSTOM maple trapdoors (warped_trapdoor[powered=true] host)
-        shaped("trapdoor_from_maple_planks", items.create(MapleType.TRAPDOOR, 2),
+        // 6 planks (3x2) -> 2 maple trapdoors
+        shaped("trapdoor_from_maple_planks", items.renamed(Material.WARPED_TRAPDOOR, "Кленовый люк", 2),
                 new String[]{"PPP", "PPP"}, 'P', planks, null, null);
 
-        // 1 plank -> 1 button
+        // 1 plank -> 1 maple button
         ShapelessRecipe button = new ShapelessRecipe(key("button_from_maple_planks"),
-                new ItemStack(Material.SPRUCE_BUTTON));
+                items.renamed(Material.WARPED_BUTTON, "Кленовая кнопка", 1));
         button.addIngredient(planks);
         plugin.getServer().addRecipe(button);
 
-        // 2 planks (row) -> 1 pressure plate
-        shaped("pressure_plate_from_maple_planks", new ItemStack(Material.SPRUCE_PRESSURE_PLATE),
+        // 2 planks (row) -> 1 maple pressure plate
+        shaped("pressure_plate_from_maple_planks",
+                items.renamed(Material.WARPED_PRESSURE_PLATE, "Кленовая нажимная плита", 1),
                 new String[]{"PP"}, 'P', planks, null, null);
 
         // 5 planks (boat shape) -> 1 boat

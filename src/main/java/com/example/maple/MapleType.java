@@ -5,10 +5,8 @@ import org.bukkit.Material;
 import org.bukkit.Note;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.Door;
 import org.bukkit.block.data.type.Leaves;
 import org.bukkit.block.data.type.NoteBlock;
-import org.bukkit.block.data.type.TrapDoor;
 
 /**
  * Registry of all Maple blocks.
@@ -25,19 +23,11 @@ import org.bukkit.block.data.type.TrapDoor;
  * (real leaves; worldgen/grown leaves are persistent=false so they never match,
  * and colliding vanilla placements are nudged to a visually identical state).
  *
- * Door and trapdoor live on the POWERED branch of the warped family:
- *
- *   Кленовая дверь -> warped_door[powered=true]  (32 orientation states)
- *   Кленовый люк   -> warped_trapdoor[powered=true, waterlogged=false]
- *
- * The powered property is changed ONLY by the server (redstone). The plugin
- * cancels physics for all warped doors/trapdoors, so a vanilla warped door can
- * never become powered — the branch is unreachable in survival. Orientation
- * properties (facing/hinge/half/open) stay fully vanilla: opening, closing,
- * sounds and collision all work natively, and the client's open/close
- * prediction preserves powered, so the maple texture never flickers on use.
- * Trade-off (documented): vanilla WARPED doors/trapdoors on the server do not
- * respond to redstone, and neither do the maple ones.
+ * Shaped blocks (stairs, slabs, fences, gates, buttons, pressure plates,
+ * doors, trapdoors) are handled by the WARPED FAMILY TAKEOVER: those warped
+ * blocks never generate in worldgen, so the resource pack retextures the whole
+ * family to maple and recipes yield renamed vanilla warped items — 100% vanilla
+ * mechanics (redstone, collision, waterlogging) with the user's textures.
  */
 public enum MapleType {
 
@@ -46,9 +36,7 @@ public enum MapleType {
     WOOD("wood", "Кленовая древесина", 1005, 3),
     STRIPPED_WOOD("stripped_wood", "Обтёсанная кленовая древесина", 1006, 4),
     PLANKS("planks", "Кленовые доски", 1004, 5),
-    LEAVES("leaves", "Листва клёна", 1002, -1),
-    DOOR("door", "Кленовая дверь", 1007, -1),
-    TRAPDOOR("trapdoor", "Кленовый люк", 1008, -1);
+    LEAVES("leaves", "Листва клёна", 1002, -1);
 
     /** The reserved note block instrument. */
     public static final Instrument MAPLE_INSTRUMENT = Instrument.DIDGERIDOO;
@@ -87,12 +75,7 @@ public enum MapleType {
 
     /** The vanilla material hosting this block (and used for the item). */
     public Material host() {
-        return switch (this) {
-            case LEAVES -> Material.AZALEA_LEAVES;
-            case DOOR -> Material.WARPED_DOOR;
-            case TRAPDOOR -> Material.WARPED_TRAPDOOR;
-            default -> Material.NOTE_BLOCK;
-        };
+        return this == LEAVES ? Material.AZALEA_LEAVES : Material.NOTE_BLOCK;
     }
 
     /**
@@ -109,21 +92,6 @@ public enum MapleType {
                 Leaves data = (Leaves) Material.AZALEA_LEAVES.createBlockData();
                 data.setDistance(LEAVES_DISTANCE);
                 data.setPersistent(true);
-                data.setWaterlogged(false);
-                return data;
-            }
-            case DOOR -> {
-                Door data = current instanceof Door door
-                        ? (Door) door.clone()
-                        : (Door) Material.WARPED_DOOR.createBlockData();
-                data.setPowered(true);
-                return data;
-            }
-            case TRAPDOOR -> {
-                TrapDoor data = current instanceof TrapDoor trapDoor
-                        ? (TrapDoor) trapDoor.clone()
-                        : (TrapDoor) Material.WARPED_TRAPDOOR.createBlockData();
-                data.setPowered(true);
                 data.setWaterlogged(false);
                 return data;
             }
@@ -148,10 +116,6 @@ public enum MapleType {
                     && leaves.isPersistent()
                     && !leaves.isWaterlogged()
                     && leaves.getDistance() == LEAVES_DISTANCE;
-            case DOOR -> data instanceof Door door && door.isPowered();
-            case TRAPDOOR -> data instanceof TrapDoor trapDoor
-                    && trapDoor.isPowered()
-                    && !trapDoor.isWaterlogged();
             default -> data instanceof NoteBlock noteBlock
                     && noteBlock.getInstrument() == MAPLE_INSTRUMENT
                     && noteBlock.getNote().getId() == note;
@@ -174,8 +138,6 @@ public enum MapleType {
                 yield null;
             }
             case AZALEA_LEAVES -> LEAVES.matches(block) ? LEAVES : null;
-            case WARPED_DOOR -> DOOR.matches(block) ? DOOR : null;
-            case WARPED_TRAPDOOR -> TRAPDOOR.matches(block) ? TRAPDOOR : null;
             default -> null;
         };
     }

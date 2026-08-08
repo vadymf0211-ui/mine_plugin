@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "minecraft:block/warped_slab"
+    },
+    "type=top": {
+      "model": "minecraft:block/warped_slab_top"
+    },
+    "type=double": {
+      "model": "minecraft:block/maple_planks"
+    }
+  }
+}

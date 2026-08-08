@@ -2,6 +2,7 @@ package com.example.maple;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -45,6 +46,21 @@ public final class MapleItems {
 
     public ItemStack createMapleLeaves(int amount) {
         return create(MapleType.LEAVES, amount);
+    }
+
+    /**
+     * A RENAMED plain vanilla item (used for the warped-family takeover
+     * results: stairs, slabs, fences, gates, buttons, plates, doors,
+     * trapdoors). No PDC, no CustomModelData — the whole warped family is
+     * re-textured by the resource pack, so these are ordinary vanilla items
+     * with a clean white non-italic name and full vanilla mechanics.
+     */
+    public ItemStack renamed(Material material, String name, int amount) {
+        ItemStack stack = new ItemStack(material, Math.max(1, amount));
+        ItemMeta meta = stack.getItemMeta();
+        meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
+        stack.setItemMeta(meta);
+        return stack;
     }
 
     /**
