@@ -6,6 +6,8 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -20,37 +22,50 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.NotePlayEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 /**
- * Handles the full lifecycle of the Maple blocks:
+ * Handles the full lifecycle of the Maple blocks.
  *
- *  PLACE   — swaps the freshly placed block to the reserved "maple" BlockState
- *            so the resource pack re-textures it.
- *  STACKING FIX — the vanilla client refuses to place a block against a note
- *            block without sneaking (a note block is "interactable": a plain
- *            right click means "tune the note"). For the Maple Log the plugin
- *            therefore performs the placement server-side, so building against
- *            it works exactly like against a normal log. Maple Leaves are a
- *            mushroom block (not interactable) — no fix needed there.
+ *  PLACE   — swaps the freshly placed block to the reserved "maple" BlockState.
+ *  STACKING FIX — the Maple Log is a note block, and the vanilla client refuses
+ *            to place a block against a note block without sneaking (it thinks a
+ *            plain right click means "tune the note"). The plugin performs that
+ *            placement server-side so maple logs stack like ordinary logs. The
+ *            Maple Leaves is a mushroom block (not interactable) — no fix needed.
  *  BREAK   — cancels vanilla drops, drops the correct custom item, plays the
- *            vanilla wood / leaves sounds and respects the correct tool:
- *              * Maple Log    — always drops (an axe simply mines faster), like vanilla logs;
- *              * Maple Leaves — drops ONLY when mined with shears, like vanilla leaves.
- *  PHYSICS — cancels BlockPhysicsEvent for ALL note blocks. This is the key
- *            trick of the note_block method: the instrument property is only
- *            recalculated from the block below during a physics update, so with
- *            physics locked a vanilla note block stays "harp" forever and the
- *            reserved "didgeridoo" state is unreachable in survival.
+ *            vanilla wood / leaves sounds, respects the tool.
+ *
+ *  STATE PROTECTION — the tricky part. Minecraft recalculates:
+ *            * a note block's INSTRUMENT from the block below it, and
+ *            * a mushroom block's connected FACES from its neighbours,
+ *            on every neighbour update. That would knock our blocks out of their
+ *            reserved state (log -> plain note block, leaves -> mushroom texture).
+ *            BlockPhysicsEvent alone is NOT enough: Paper only guarantees the
+ *            event for the "root" block of an update, so ADJACENT blocks that get
+ *            recalculated slip through (this is why breaking the middle of a
+ *            stack reverted the neighbours). We therefore combine:
+ *              1) cancel BlockPhysicsEvent for note & mushroom blocks (cheap,
+ *                 catches the root/direct updates), and
+ *              2) before every place/break/explosion, remember which neighbours
+ *                 were maple blocks and re-assert their exact state on the next
+ *                 tick (catches the adjacent updates the event misses).
+ *            For servers that want a zero-flicker guarantee, enabling
+ *            `block-updates.disable-noteblock-updates: true` in paper-global.yml
+ *            is recommended on top of this (see README).
  *  EXPLODE — keeps drops consistent when blocks are destroyed by explosions.
  */
 public final class MapleListener implements Listener {
+
+    private static final BlockFace[] NEIGHBOURS = {
+            BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
+    };
 
     private final MaplePlugin plugin;
     private final MapleItems items;
@@ -75,47 +90,40 @@ public final class MapleListener implements Listener {
 
         switch (type) {
             case MapleItems.TYPE_LOG -> {
-                // note_block[instrument=didgeridoo,note=1,powered=false]
                 block.setBlockData(MapleBlocks.mapleLogData(), false);
-                // Vanilla already plays the wood place sound for note blocks — perfect for a log.
             }
             case MapleItems.TYPE_LEAVES -> {
-                // red_mushroom_block[up=true,down=true,north/south/east/west=false]
                 block.setBlockData(MapleBlocks.mapleLeavesData(), false);
-                // Layer the vanilla leaves (grass) place sound on top so it sounds like foliage.
                 playSound(block.getLocation(), Sound.BLOCK_GRASS_PLACE);
             }
             default -> {
-                // Unknown tag value — leave the vanilla block untouched.
+                return;
             }
         }
+
+        // Placing next to another maple block makes both recalculate; protect the
+        // placed block AND its neighbours so nothing connects / retunes.
+        protectArea(block);
     }
 
     // ------------------------------------------------------------------
-    // PHYSICS LOCK — the core of the note_block method
+    // STATE PROTECTION
     // ------------------------------------------------------------------
 
     /**
-     * Cancels physics updates for ALL note blocks.
-     *
-     * Without this, placing e.g. a pumpkin under a note block would switch its
-     * instrument to "didgeridoo" and a right-click would produce our reserved
-     * state in pure survival. With physics locked, the instrument property can
-     * never change, so the reserved state stays exclusive.
-     *
-     * Known trade-off (documented in README): vanilla note blocks keep the
-     * default "harp" instrument regardless of the block below them.
+     * Cancels physics updates for note & mushroom blocks — the two host types.
+     * Cheap and catches the "root" updates. Adjacent updates are handled by
+     * {@link #protectArea(Block)} / {@link #protectNeighbours(Block)}.
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPhysics(BlockPhysicsEvent event) {
-        if (event.getBlock().getType() == Material.NOTE_BLOCK) {
+        Material type = event.getBlock().getType();
+        if (type == Material.NOTE_BLOCK || type == Material.RED_MUSHROOM_BLOCK) {
             event.setCancelled(true);
         }
     }
 
-    /**
-     * The Maple Log must never behave like an instrument (left click / redstone).
-     */
+    /** The Maple Log must never behave like an instrument (left click / redstone). */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onNotePlay(NotePlayEvent event) {
         if (MapleBlocks.isMapleLog(event.getBlock())) {
@@ -123,18 +131,69 @@ public final class MapleListener implements Listener {
         }
     }
 
+    /**
+     * Re-asserts a maple block's canonical state on the NEXT tick.
+     *
+     * We record the type NOW (while the block is still ours) and re-apply it
+     * after vanilla has finished its neighbour recalculations. If by then the
+     * host block is still present but no longer matches our reserved state
+     * (i.e. it was retuned / reconnected), we set it back.
+     */
+    private void protectArea(Block center) {
+        List<Saved> saved = new ArrayList<>();
+        collect(center, saved);
+        for (BlockFace face : NEIGHBOURS) {
+            collect(center.getRelative(face), saved);
+        }
+        reassertNextTick(saved);
+    }
+
+    private void protectNeighbours(Block center) {
+        List<Saved> saved = new ArrayList<>();
+        for (BlockFace face : NEIGHBOURS) {
+            collect(center.getRelative(face), saved);
+        }
+        reassertNextTick(saved);
+    }
+
+    private void collect(Block block, List<Saved> out) {
+        if (MapleBlocks.isMapleLog(block)) {
+            out.add(new Saved(block, MapleItems.TYPE_LOG));
+        } else if (MapleBlocks.isMapleLeaves(block)) {
+            out.add(new Saved(block, MapleItems.TYPE_LEAVES));
+        }
+    }
+
+    private void reassertNextTick(List<Saved> saved) {
+        if (saved.isEmpty()) {
+            return;
+        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            for (Saved s : saved) {
+                Block b = s.block();
+                if (s.type().equals(MapleItems.TYPE_LOG)) {
+                    // Still a note block but retuned away from our state -> restore.
+                    if (b.getType() == Material.NOTE_BLOCK && !MapleBlocks.isMapleLog(b)) {
+                        b.setBlockData(MapleBlocks.mapleLogData(), false);
+                    }
+                } else {
+                    // Still a mushroom block but reconnected away from our state -> restore.
+                    if (b.getType() == Material.RED_MUSHROOM_BLOCK && !MapleBlocks.isMapleLeaves(b)) {
+                        b.setBlockData(MapleBlocks.mapleLeavesData(), false);
+                    }
+                }
+            }
+        });
+    }
+
+    /** Snapshot of a maple block's identity, taken before a disruptive event. */
+    private record Saved(Block block, String type) {
+    }
+
     // ------------------------------------------------------------------
     // STACKING FIX — server-side placement against the Maple Log
     // ------------------------------------------------------------------
 
-    /**
-     * A right click on our Maple Log:
-     *  1) must never tune the note (that would change the BlockState),
-     *  2) must place the held block, because the CLIENT refuses to do it
-     *     itself: it thinks it is clicking a note block, and note blocks only
-     *     accept placement while sneaking. We replicate the vanilla placement
-     *     server-side so maple logs stack like ordinary logs.
-     */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
@@ -145,13 +204,12 @@ public final class MapleListener implements Listener {
             return;
         }
 
-        // 1) Never allow vanilla note tuning on the custom block.
+        // Never allow vanilla note tuning on the custom block.
         event.setUseInteractedBlock(Event.Result.DENY);
 
         Player player = event.getPlayer();
         if (player.isSneaking()) {
-            // While sneaking the client performs normal placement itself.
-            return;
+            return; // While sneaking the client performs normal placement itself.
         }
 
         ItemStack item = event.getItem();
@@ -159,12 +217,10 @@ public final class MapleListener implements Listener {
             return;
         }
 
-        // 2) Manual server-side placement.
         Block target = clicked.getRelative(event.getBlockFace());
         if (!target.isReplaceable()) {
             return;
         }
-        // Don't place inside players/mobs.
         boolean occupied = !target.getWorld()
                 .getNearbyEntities(BoundingBox.of(target), entity -> entity instanceof LivingEntity)
                 .isEmpty();
@@ -177,16 +233,6 @@ public final class MapleListener implements Listener {
                 event.getHand() == null ? EquipmentSlot.HAND : event.getHand());
     }
 
-    /**
-     * Replicates vanilla block placement: sets the block, fires a regular
-     * BlockPlaceEvent (so protection plugins can veto it and our own PLACE
-     * handler converts maple items), consumes the item and plays the sound.
-     *
-     * Note: orientable blocks (stairs, logs, furnaces...) are placed with their
-     * default orientation here — the client does not send us its aim data for
-     * this click. Maple blocks themselves are orientation-free, so they always
-     * place perfectly.
-     */
     private void placeManually(Player player, ItemStack item, Block target, Block against, EquipmentSlot hand) {
         org.bukkit.block.BlockState replaced = target.getState();
 
@@ -216,6 +262,12 @@ public final class MapleListener implements Listener {
         target.getWorld().playSound(center, target.getBlockData().getSoundGroup().getPlaceSound(),
                 SoundCategory.BLOCKS, 1.0f, 0.8f);
         player.swingHand(hand);
+
+        // A maple item was just placed manually: apply foliage sound + protect.
+        if (MapleItems.TYPE_LEAVES.equals(mapleType)) {
+            playSound(target.getLocation(), Sound.BLOCK_GRASS_PLACE);
+        }
+        protectArea(target);
     }
 
     // ------------------------------------------------------------------
@@ -228,35 +280,29 @@ public final class MapleListener implements Listener {
         Player player = event.getPlayer();
 
         if (MapleBlocks.isMapleLog(block)) {
-            // Never let the vanilla note block loot table run (it would drop a note block).
             event.setDropItems(false);
             event.setExpToDrop(0);
-
-            // Vanilla plays the wood break sound for note blocks automatically — correct for a log.
             if (player.getGameMode() != GameMode.CREATIVE) {
-                // Logs always drop themselves, whatever the tool (an axe is just faster) — vanilla behaviour.
                 dropItem(block, items.createMapleLog(1));
             }
+            // Neighbours (e.g. logs above/below) would recalc — protect them.
+            protectNeighbours(block);
             return;
         }
 
         if (MapleBlocks.isMapleLeaves(block)) {
-            // Never let the vanilla mushroom loot table run.
             event.setDropItems(false);
             event.setExpToDrop(0);
-
-            // Vanilla leaves use the grass sound family.
             playSound(block.getLocation(), Sound.BLOCK_GRASS_BREAK);
-
             if (player.getGameMode() != GameMode.CREATIVE && isShears(player.getInventory().getItemInMainHand())) {
-                // Leaves drop themselves ONLY when cut with shears — vanilla behaviour.
                 dropItem(block, items.createMapleLeaves(1));
             }
+            protectNeighbours(block);
         }
     }
 
     // ------------------------------------------------------------------
-    // EXPLOSIONS — keep drops consistent
+    // EXPLOSIONS
     // ------------------------------------------------------------------
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -270,20 +316,24 @@ public final class MapleListener implements Listener {
     }
 
     private void handleExplosion(List<Block> blockList) {
+        List<Block> touched = new ArrayList<>();
         Iterator<Block> iterator = blockList.iterator();
         while (iterator.hasNext()) {
             Block block = iterator.next();
             if (MapleBlocks.isMapleLog(block)) {
-                // Remove from the vanilla explosion handling (which would drop a
-                // note block) and resolve it ourselves: logs drop themselves.
                 iterator.remove();
+                touched.add(block);
                 block.setType(Material.AIR, false);
                 dropItem(block, items.createMapleLog(1));
             } else if (MapleBlocks.isMapleLeaves(block)) {
-                // Vanilla leaves destroyed by an explosion drop nothing (no shears involved).
                 iterator.remove();
+                touched.add(block);
                 block.setType(Material.AIR, false);
             }
+        }
+        // Protect any maple blocks bordering the blast that survived.
+        for (Block block : touched) {
+            protectNeighbours(block);
         }
     }
 
