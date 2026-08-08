@@ -5,7 +5,23 @@
 | Блок | Предмет | Ванильный BlockState | CustomModelData |
 |---|---|---|---|
 | **Клён** (Maple Log) | `note_block` | `note_block[instrument=didgeridoo,note=1]` | `1001` |
+| **Обтёсанный клён** | `note_block` | `note_block[instrument=didgeridoo,note=2]` | `1003` |
+| **Кленовая древесина** | `note_block` | `note_block[instrument=didgeridoo,note=3]` | `1005` |
+| **Обтёсанная кленовая древесина** | `note_block` | `note_block[instrument=didgeridoo,note=4]` | `1006` |
+| **Кленовые доски** | `note_block` | `note_block[instrument=didgeridoo,note=5]` | `1004` |
 | **Листва клёна** (Maple Leaves) | `azalea_leaves` | `azalea_leaves[distance=7,persistent=true,waterlogged=false]` | `1002` |
+
+## Крафты и механики дерева (v1.7.0)
+
+Полный набор ванильных механик дерева:
+- **1 бревно / обтёсанное бревно / древесина / обтёсанная древесина → 4 кленовые доски**
+- **4 бревна (2×2) → 3 кленовые древесины**; 4 обтёсанных бревна → 3 обтёсанные древесины
+- **2 доски (столбиком) → 4 палки** (ванильные)
+- **4 доски (2×2) → верстак**, **8 досок (кольцом) → сундук**
+- **Обтёсывание топором**: ПКМ топором по Клёну/Древесине → обтёсанный вариант (звук, расход прочности — как в ванилле)
+- Кастомные ингредиенты матчатся через `ExactChoice` — обычные нотные блоки в кленовых крафтах не работают, и наоборот
+
+Не включено намеренно: таблички, подвесные таблички, полки (по требованиям проекта). **Двери, люки и саженцы невозможны** методом занятых BlockState: у всех ванильных дверей/люков каждое состояние достижимо в выживании (резервировать нечего), а их форма и коллизия зашиты в движке; саженцу нужен ещё и кастомный рост дерева. Текстуры `clen_door_*`, `clen_trapdoor`, `clen_sapling` сохранены в паке для будущей реализации через display-entities.
 
 ## Почему не oak_log / oak_leaves
 
@@ -40,9 +56,10 @@ mine_plugin/
 │       ├── java/com/example/maple/
 │       │   ├── MaplePlugin.java      # главный класс
 │       │   ├── MapleItems.java       # фабрика кастомных предметов (CMD + PDC)
-│       │   ├── MapleBlocks.java      # определения/детект BlockState
-│       │   ├── MapleListener.java    # установка, стакание, разрушение, физика, взрывы
-│       │   └── MapleCommand.java     # /maple give <log|leaves> [amount]
+│       │   ├── MapleType.java        # реестр всех кленовых блоков (BlockState, CMD, имена)
+│       │   ├── MapleListener.java    # установка, стакание, обтёсывание, разрушение, физика, взрывы
+│       │   ├── MapleRecipes.java     # ванильные крафты кленового набора
+│       │   └── MapleCommand.java     # /maple give <тип> [amount]
 │       └── resources/
 │           └── plugin.yml
 └── resourcepack/
@@ -75,7 +92,7 @@ mine_plugin/
 mvn clean package
 ```
 
-Готовый jar: `target/MapleBlocks-1.6.0.jar` → положить в папку `plugins/` сервера Paper 1.21.1.
+Готовый jar: `target/MapleBlocks-1.7.0.jar` → положить в папку `plugins/` сервера Paper 1.21.1.
 
 ## Установка ресурспака
 
@@ -89,8 +106,7 @@ cd resourcepack && zip -r ../MapleBlocks-ResourcePack.zip . && cd ..
 
 ## Использование
 
-- `/maple give log [кол-во]` — выдать Клён
-- `/maple give leaves [кол-во]` — выдать Листву клёна
+- `/maple give <log|stripped_log|wood|stripped_wood|planks|leaves> [кол-во]`
 - Право: `mapleblocks.give` (по умолчанию op)
 
 ## Игровое поведение

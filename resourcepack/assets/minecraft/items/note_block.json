@@ -9,6 +9,34 @@
           "type": "minecraft:model",
           "model": "minecraft:block/maple_log"
         }
+      },
+      {
+        "threshold": 1003,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:block/stripped_maple_log"
+        }
+      },
+      {
+        "threshold": 1004,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:block/maple_planks"
+        }
+      },
+      {
+        "threshold": 1005,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:block/maple_wood"
+        }
+      },
+      {
+        "threshold": 1006,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:block/stripped_maple_wood"
+        }
       }
     ],
     "fallback": {

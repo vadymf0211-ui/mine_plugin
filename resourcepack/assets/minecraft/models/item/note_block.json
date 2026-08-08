@@ -6,6 +6,30 @@
         "custom_model_data": 1001
       },
       "model": "minecraft:block/maple_log"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 1003
+      },
+      "model": "minecraft:block/stripped_maple_log"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 1004
+      },
+      "model": "minecraft:block/maple_planks"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 1005
+      },
+      "model": "minecraft:block/maple_wood"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 1006
+      },
+      "model": "minecraft:block/stripped_maple_wood"
     }
   ]
 }

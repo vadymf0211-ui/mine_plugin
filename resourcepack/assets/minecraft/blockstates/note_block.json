@@ -11,6 +11,42 @@
     },
     {
       "when": {
+        "instrument": "didgeridoo",
+        "note": "2"
+      },
+      "apply": {
+        "model": "minecraft:block/stripped_maple_log"
+      }
+    },
+    {
+      "when": {
+        "instrument": "didgeridoo",
+        "note": "3"
+      },
+      "apply": {
+        "model": "minecraft:block/maple_wood"
+      }
+    },
+    {
+      "when": {
+        "instrument": "didgeridoo",
+        "note": "4"
+      },
+      "apply": {
+        "model": "minecraft:block/stripped_maple_wood"
+      }
+    },
+    {
+      "when": {
+        "instrument": "didgeridoo",
+        "note": "5"
+      },
+      "apply": {
+        "model": "minecraft:block/maple_planks"
+      }
+    },
+    {
+      "when": {
         "OR": [
           {
             "instrument": "harp"
@@ -90,22 +126,6 @@
           {
             "instrument": "didgeridoo",
             "note": "0"
-          },
-          {
-            "instrument": "didgeridoo",
-            "note": "2"
-          },
-          {
-            "instrument": "didgeridoo",
-            "note": "3"
-          },
-          {
-            "instrument": "didgeridoo",
-            "note": "4"
-          },
-          {
-            "instrument": "didgeridoo",
-            "note": "5"
           },
           {
             "instrument": "didgeridoo",

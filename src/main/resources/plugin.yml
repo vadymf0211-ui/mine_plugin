@@ -8,7 +8,7 @@ author: YourName
 commands:
   maple:
     description: Give maple blocks
-    usage: /maple give <log|leaves> [amount]
+    usage: /maple give <log|stripped_log|wood|stripped_wood|planks|leaves> [amount]
     permission: mapleblocks.give
 
 permissions:

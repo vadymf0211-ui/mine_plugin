@@ -6,17 +6,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 /**
  * MapleBlocks — adds Maple Log and Maple Leaves as "clean" custom blocks.
  *
- * Implementation: reserved vanilla BlockStates.
- *  - Maple Log    -> note_block[instrument=didgeridoo, note=1]
- *                    (real wooden block; the plugin locks note block physics so
- *                    the reserved instrument is unreachable, and places blocks
- *                    against it server-side so it stacks like a normal log)
- *  - Maple Leaves -> red_mushroom_block[up=true, down=true, sides=false]
- *                    (non-interactable, breaks fast like foliage; this face
- *                    combination never occurs in vanilla)
- *
- * oak_log / oak_leaves cannot be used as hosts: every one of their states is
- * reachable in vanilla gameplay, so there is nothing safe to re-texture.
+ * Implementation: reserved vanilla BlockStates — see MapleType for the full
+ * registry (log, stripped log, wood, stripped wood, planks on note_block
+ * states; leaves on an azalea_leaves state) and the reasoning behind each
+ * host choice. MapleRecipes wires the vanilla-parity crafting set.
  */
 public final class MaplePlugin extends JavaPlugin {
 
@@ -32,6 +25,8 @@ public final class MaplePlugin extends JavaPlugin {
         this.items = new MapleItems(this);
 
         getServer().getPluginManager().registerEvents(new MapleListener(this, items), this);
+
+        new MapleRecipes(this, items).registerAll();
 
         MapleCommand command = new MapleCommand(items);
         getCommand("maple").setExecutor(command);

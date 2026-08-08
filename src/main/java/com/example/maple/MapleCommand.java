@@ -9,11 +9,12 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * /maple give <log|leaves> [amount]
+ * /maple give <log|stripped_log|wood|stripped_wood|planks|leaves> [amount]
  *
  * Simple admin command to obtain the custom items.
  */
@@ -36,6 +37,11 @@ public final class MapleCommand implements CommandExecutor, TabCompleter {
             return false;
         }
 
+        MapleType type = MapleType.byId(args[1].toLowerCase());
+        if (type == null) {
+            return false;
+        }
+
         int amount = 1;
         if (args.length >= 3) {
             try {
@@ -46,15 +52,7 @@ public final class MapleCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        ItemStack stack;
-        switch (args[1].toLowerCase()) {
-            case "log" -> stack = items.createMapleLog(amount);
-            case "leaves" -> stack = items.createMapleLeaves(amount);
-            default -> {
-                return false;
-            }
-        }
-
+        ItemStack stack = items.create(type, amount);
         player.getInventory().addItem(stack);
         player.sendMessage(Component.text("Выдано: ", NamedTextColor.GREEN)
                 .append(stack.getItemMeta().displayName())
@@ -68,7 +66,7 @@ public final class MapleCommand implements CommandExecutor, TabCompleter {
             return filter(Stream.of("give"), args[0]);
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
-            return filter(Stream.of("log", "leaves"), args[1]);
+            return filter(Arrays.stream(MapleType.values()).map(MapleType::id), args[1]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("give")) {
             return filter(Stream.of("1", "16", "64"), args[2]);
