@@ -3,6 +3,7 @@ package com.example.maple;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Tag;
+import org.bukkit.inventory.FurnaceRecipe;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
@@ -123,6 +124,130 @@ public final class MapleRecipes {
         // 3 planks (bowl shape) -> 4 bowls
         shaped("bowls_from_maple_planks", new ItemStack(Material.BOWL, 4),
                 new String[]{"P P", " P "}, 'P', planks, null, null);
+
+        // ---------- wooden tools & weapons ----------
+        // (vanilla wooden tools are identical for every wood family — this IS
+        //  the correct vanilla result for maple planks)
+        shaped("wooden_sword_from_maple_planks", new ItemStack(Material.WOODEN_SWORD),
+                new String[]{"P", "P", "S"}, 'P', planks, 'S', stick);
+        shaped("wooden_pickaxe_from_maple_planks", new ItemStack(Material.WOODEN_PICKAXE),
+                new String[]{"PPP", " S ", " S "}, 'P', planks, 'S', stick);
+        shaped("wooden_axe_from_maple_planks", new ItemStack(Material.WOODEN_AXE),
+                new String[]{"PP", "PS", " S"}, 'P', planks, 'S', stick);
+        shaped("wooden_shovel_from_maple_planks", new ItemStack(Material.WOODEN_SHOVEL),
+                new String[]{"P", "S", "S"}, 'P', planks, 'S', stick);
+        shaped("wooden_hoe_from_maple_planks", new ItemStack(Material.WOODEN_HOE),
+                new String[]{"PP", " S", " S"}, 'P', planks, 'S', stick);
+
+        // ---------- utility blocks & items ----------
+        RecipeChoice iron = new RecipeChoice.MaterialChoice(Material.IRON_INGOT);
+
+        // shield: 6 planks + 1 iron ingot
+        shaped("shield_from_maple_planks", new ItemStack(Material.SHIELD),
+                new String[]{"PIP", "PPP", " P "}, 'P', planks, 'I', iron);
+
+        // bed: 3 wool + 3 planks
+        shaped("bed_from_maple_planks", new ItemStack(Material.WHITE_BED),
+                new String[]{"WWW", "PPP"}, 'P', planks,
+                'W', new RecipeChoice.MaterialChoice(Material.WHITE_WOOL));
+
+        // bookshelf: 6 planks + 3 books
+        shaped("bookshelf_from_maple_planks", new ItemStack(Material.BOOKSHELF),
+                new String[]{"PPP", "BBB", "PPP"}, 'P', planks,
+                'B', new RecipeChoice.MaterialChoice(Material.BOOK));
+
+        // jukebox: 8 planks + 1 diamond
+        shaped("jukebox_from_maple_planks", new ItemStack(Material.JUKEBOX),
+                new String[]{"PPP", "PDP", "PPP"}, 'P', planks,
+                'D', new RecipeChoice.MaterialChoice(Material.DIAMOND));
+
+        // note block: 8 planks + 1 redstone (a REAL vanilla note block)
+        shaped("note_block_from_maple_planks", new ItemStack(Material.NOTE_BLOCK),
+                new String[]{"PPP", "PRP", "PPP"}, 'P', planks,
+                'R', new RecipeChoice.MaterialChoice(Material.REDSTONE));
+
+        // piston
+        ShapedRecipe piston = new ShapedRecipe(key("piston_from_maple_planks"), new ItemStack(Material.PISTON));
+        piston.shape("PPP", "CIC", "CRC");
+        piston.setIngredient('P', planks);
+        piston.setIngredient('C', new RecipeChoice.MaterialChoice(Material.COBBLESTONE));
+        piston.setIngredient('I', iron);
+        piston.setIngredient('R', new RecipeChoice.MaterialChoice(Material.REDSTONE));
+        plugin.getServer().addRecipe(piston);
+
+        // loom: 2 string + 2 planks
+        shaped("loom_from_maple_planks", new ItemStack(Material.LOOM),
+                new String[]{"TT", "PP"}, 'P', planks,
+                'T', new RecipeChoice.MaterialChoice(Material.STRING));
+
+        // cartography table: 2 paper + 4 planks
+        shaped("cartography_table_from_maple_planks", new ItemStack(Material.CARTOGRAPHY_TABLE),
+                new String[]{"MM", "PP", "PP"}, 'P', planks,
+                'M', new RecipeChoice.MaterialChoice(Material.PAPER));
+
+        // fletching table: 2 flint + 4 planks
+        shaped("fletching_table_from_maple_planks", new ItemStack(Material.FLETCHING_TABLE),
+                new String[]{"FF", "PP", "PP"}, 'P', planks,
+                'F', new RecipeChoice.MaterialChoice(Material.FLINT));
+
+        // smithing table: 2 iron + 4 planks
+        shaped("smithing_table_from_maple_planks", new ItemStack(Material.SMITHING_TABLE),
+                new String[]{"II", "PP", "PP"}, 'P', planks, 'I', iron);
+
+        // grindstone: 2 sticks + stone slab + 2 planks
+        ShapedRecipe grindstone = new ShapedRecipe(key("grindstone_from_maple_planks"),
+                new ItemStack(Material.GRINDSTONE));
+        grindstone.shape("SQS", "P P");
+        grindstone.setIngredient('S', stick);
+        grindstone.setIngredient('Q', new RecipeChoice.MaterialChoice(Material.STONE_SLAB));
+        grindstone.setIngredient('P', planks);
+        plugin.getServer().addRecipe(grindstone);
+
+        // tripwire hook: iron + stick + plank -> 2
+        ShapedRecipe tripwireHook = new ShapedRecipe(key("tripwire_hook_from_maple_planks"),
+                new ItemStack(Material.TRIPWIRE_HOOK, 2));
+        tripwireHook.shape("I", "S", "P");
+        tripwireHook.setIngredient('I', iron);
+        tripwireHook.setIngredient('S', stick);
+        tripwireHook.setIngredient('P', planks);
+        plugin.getServer().addRecipe(tripwireHook);
+
+        // daylight detector: glass + quartz + any wooden slabs
+        ShapedRecipe daylight = new ShapedRecipe(key("daylight_detector_from_maple"),
+                new ItemStack(Material.DAYLIGHT_DETECTOR));
+        daylight.shape("GGG", "QQQ", "WWW");
+        daylight.setIngredient('G', new RecipeChoice.MaterialChoice(Material.GLASS));
+        daylight.setIngredient('Q', new RecipeChoice.MaterialChoice(Material.QUARTZ));
+        daylight.setIngredient('W', new RecipeChoice.MaterialChoice(Tag.WOODEN_SLABS));
+        plugin.getServer().addRecipe(daylight);
+
+        // ---------- campfires ----------
+        RecipeChoice coal = new RecipeChoice.MaterialChoice(Material.COAL, Material.CHARCOAL);
+        RecipeChoice mapleLog = exact(MapleType.LOG);
+
+        ShapedRecipe campfire = new ShapedRecipe(key("campfire_from_maple_log"), new ItemStack(Material.CAMPFIRE));
+        campfire.shape(" S ", "SCS", "LLL");
+        campfire.setIngredient('S', stick);
+        campfire.setIngredient('C', coal);
+        campfire.setIngredient('L', mapleLog);
+        plugin.getServer().addRecipe(campfire);
+
+        ShapedRecipe soulCampfire = new ShapedRecipe(key("soul_campfire_from_maple_log"),
+                new ItemStack(Material.SOUL_CAMPFIRE));
+        soulCampfire.shape(" S ", "SXS", "LLL");
+        soulCampfire.setIngredient('S', stick);
+        soulCampfire.setIngredient('X', new RecipeChoice.MaterialChoice(Material.SOUL_SAND, Material.SOUL_SOIL));
+        soulCampfire.setIngredient('L', mapleLog);
+        plugin.getServer().addRecipe(soulCampfire);
+
+        // ---------- smelting: maple logs -> charcoal ----------
+        for (MapleType logLike : new MapleType[]{MapleType.LOG, MapleType.STRIPPED_LOG,
+                MapleType.WOOD, MapleType.STRIPPED_WOOD}) {
+            plugin.getServer().addRecipe(new FurnaceRecipe(
+                    key("charcoal_from_maple_" + logLike.id()),
+                    new ItemStack(Material.CHARCOAL),
+                    exact(logLike), 0.15f, 200));
+        }
 
         plugin.getLogger().info("Registered maple crafting recipes.");
     }
