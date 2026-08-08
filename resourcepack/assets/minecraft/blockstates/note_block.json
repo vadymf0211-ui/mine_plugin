@@ -11,15 +11,6 @@
     },
     {
       "when": {
-        "instrument": "didgeridoo",
-        "note": "2"
-      },
-      "apply": {
-        "model": "minecraft:block/maple_leaves"
-      }
-    },
-    {
-      "when": {
         "OR": [
           {
             "instrument": "harp"
@@ -99,6 +90,10 @@
           {
             "instrument": "didgeridoo",
             "note": "0"
+          },
+          {
+            "instrument": "didgeridoo",
+            "note": "2"
           },
           {
             "instrument": "didgeridoo",

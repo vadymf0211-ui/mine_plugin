@@ -36,16 +36,16 @@ public final class MapleItems {
 
     /** Creates the Maple Log item ("Клён"). */
     public ItemStack createMapleLog(int amount) {
-        return build("Клён", CMD_MAPLE_LOG, TYPE_LOG, amount);
+        return build(Material.NOTE_BLOCK, "Клён", CMD_MAPLE_LOG, TYPE_LOG, amount);
     }
 
     /** Creates the Maple Leaves item ("Листва клёна"). */
     public ItemStack createMapleLeaves(int amount) {
-        return build("Листва клёна", CMD_MAPLE_LEAVES, TYPE_LEAVES, amount);
+        return build(Material.RED_MUSHROOM_BLOCK, "Листва клёна", CMD_MAPLE_LEAVES, TYPE_LEAVES, amount);
     }
 
-    private ItemStack build(String name, int customModelData, String type, int amount) {
-        ItemStack stack = new ItemStack(Material.NOTE_BLOCK, Math.max(1, amount));
+    private ItemStack build(Material material, String name, int customModelData, String type, int amount) {
+        ItemStack stack = new ItemStack(material, Math.max(1, amount));
         ItemMeta meta = stack.getItemMeta();
 
         // Vanilla-looking name: white, non-italic, no lore.

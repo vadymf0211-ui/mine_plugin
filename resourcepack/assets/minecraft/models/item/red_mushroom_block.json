@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/red_mushroom_block_inventory",
+  "overrides": [
+    {
+      "predicate": {
+        "custom_model_data": 1002
+      },
+      "model": "minecraft:block/maple_leaves"
+    }
+  ]
+}
