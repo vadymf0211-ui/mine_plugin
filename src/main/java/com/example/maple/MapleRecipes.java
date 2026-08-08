@@ -93,12 +93,12 @@ public final class MapleRecipes {
         shaped("fence_gate_from_maple_planks", new ItemStack(Material.SPRUCE_FENCE_GATE),
                 new String[]{"SPS", "SPS"}, 'P', planks, 'S', stick);
 
-        // 6 planks (2x3) -> 3 doors
-        shaped("door_from_maple_planks", new ItemStack(Material.SPRUCE_DOOR, 3),
+        // 6 planks (2x3) -> 3 CUSTOM maple doors (warped_door[powered=true] host)
+        shaped("door_from_maple_planks", items.create(MapleType.DOOR, 3),
                 new String[]{"PP", "PP", "PP"}, 'P', planks, null, null);
 
-        // 6 planks (3x2) -> 2 trapdoors
-        shaped("trapdoor_from_maple_planks", new ItemStack(Material.SPRUCE_TRAPDOOR, 2),
+        // 6 planks (3x2) -> 2 CUSTOM maple trapdoors (warped_trapdoor[powered=true] host)
+        shaped("trapdoor_from_maple_planks", items.create(MapleType.TRAPDOOR, 2),
                 new String[]{"PPP", "PPP"}, 'P', planks, null, null);
 
         // 1 plank -> 1 button

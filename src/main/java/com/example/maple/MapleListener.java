@@ -8,7 +8,9 @@ import org.bukkit.SoundCategory;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.type.Door;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -42,25 +44,21 @@ import java.util.Set;
  * Handles the full lifecycle of all Maple blocks (see {@link MapleType}).
  *
  *  PLACE   — items place through the vanilla path and are swapped to the
- *            reserved state right after. Vanilla azalea leaves that would land
- *            in our reserved state are nudged to a visually identical one.
+ *            reserved state right after (doors: both halves).
  *  STRIP   — right-clicking the maple log / wood with an axe converts it to the
  *            stripped variant, exactly like vanilla logs.
- *  STACKING FIX — the vanilla client refuses to place a block against a note
- *            block without sneaking (right click = "tune the note"), so the
- *            plugin performs that placement server-side for every note-based
- *            maple block.
+ *  STACKING FIX — server-side placement against note-based maple blocks (the
+ *            client refuses to place against a note block without sneaking).
+ *  DOORS   — vanilla open/close works natively (the open property is toggled by
+ *            interaction and preserves powered). Because door physics is
+ *            locked, the plugin syncs the second half's open state itself and
+ *            handles half-pair breaking for BOTH maple and vanilla warped doors.
  *  BREAK   — cancels vanilla drops, drops the correct custom item, respects the
- *            tool (wooden blocks: always drop, axe is just faster; leaves:
- *            shears only). Sounds are native (note block = wood, azalea =
- *            leaves).
- *  STATE PROTECTION — Paper fires BlockPhysicsEvent only for the ROOT block of
- *            an update; neighbours are recalculated silently. So: physics is
- *            cancelled for our blocks, EVERY root event queues a next-tick
- *            re-assertion of adjacent maple blocks, place/break/explosions
- *            protect the area explicitly, canonical states are re-sent to
- *            nearby clients, pistons cannot move maple blocks, and growing
- *            trees cannot overwrite them. Re-assertions dedup per tick.
+ *            tool (wooden blocks: always drop; leaves: shears only).
+ *  STATE PROTECTION — physics cancelled for host blocks, every root physics
+ *            event queues a next-tick re-assertion of adjacent maple blocks,
+ *            canonical states are re-sent to nearby clients, pistons cannot
+ *            move maple blocks, growing trees cannot overwrite them.
  */
 public final class MapleListener implements Listener {
 
@@ -93,8 +91,7 @@ public final class MapleListener implements Listener {
 
         if (type == null) {
             // A VANILLA azalea leaves placement that happens to land exactly in
-            // our reserved state (persistent, far from logs -> distance=7) gets
-            // nudged to distance=6: visually identical, decay-immune, no clash.
+            // our reserved state gets nudged to a visually identical one.
             if (block.getType() == Material.AZALEA_LEAVES && MapleType.LEAVES.matches(block)) {
                 block.setBlockData(MapleType.vanillaEscapeLeavesData(), false);
             }
@@ -103,7 +100,18 @@ public final class MapleListener implements Listener {
             return;
         }
 
-        block.setBlockData(type.createData(), false);
+        // Preserve vanilla-computed orientation (doors: facing/hinge; trapdoors:
+        // facing/half) and force only the reserved discriminator.
+        block.setBlockData(type.reservedData(block.getBlockData()), false);
+
+        if (type == MapleType.DOOR) {
+            // Doors are two blocks: mark the upper half as well.
+            Block top = block.getRelative(BlockFace.UP);
+            if (top.getType() == Material.WARPED_DOOR) {
+                top.setBlockData(MapleType.DOOR.reservedData(top.getBlockData()), false);
+            }
+        }
+
         protectArea(block);
     }
 
@@ -114,17 +122,18 @@ public final class MapleListener implements Listener {
     /**
      * Root physics handler.
      *
-     * For our own blocks the event is cancelled outright. For every OTHER root
-     * update we schedule a re-assertion of adjacent maple blocks: Paper fires
-     * this event only for the root of an update chain, and the neighbours
-     * (whose instrument/distance the engine recalculates in the same pass) get
-     * no event of their own.
+     * Note blocks and warped doors/trapdoors: cancelled for ALL of them — the
+     * reserved discriminators (instrument / powered) change only through
+     * physics, so locking it makes the reserved branches unreachable.
+     * Azalea leaves: cancelled only in our exact state.
+     * Any other root update: shield adjacent maple blocks (Paper fires the
+     * event only for the root; neighbours are recalculated silently).
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPhysics(BlockPhysicsEvent event) {
         Block block = event.getBlock();
         Material type = block.getType();
-        if (type == Material.NOTE_BLOCK) {
+        if (type == Material.NOTE_BLOCK || type == Material.WARPED_DOOR || type == Material.WARPED_TRAPDOOR) {
             event.setCancelled(true);
             return;
         }
@@ -132,7 +141,6 @@ public final class MapleListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        // Root update of a foreign block: shield its maple neighbours.
         protectNeighbours(block);
     }
 
@@ -144,15 +152,16 @@ public final class MapleListener implements Listener {
         }
     }
 
-    /** Waterlogging our leaves would knock them out of the reserved state. */
+    /** Waterlogging our leaves/trapdoors would knock them out of the reserved state. */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBucketEmpty(PlayerBucketEmptyEvent event) {
         Block clicked = event.getBlockClicked();
         if (clicked == null) {
             return;
         }
-        if (MapleType.LEAVES.matches(clicked)
-                || MapleType.LEAVES.matches(clicked.getRelative(event.getBlockFace()))) {
+        Block relative = clicked.getRelative(event.getBlockFace());
+        if (MapleType.LEAVES.matches(clicked) || MapleType.LEAVES.matches(relative)
+                || MapleType.TRAPDOOR.matches(clicked) || MapleType.TRAPDOOR.matches(relative)) {
             event.setCancelled(true);
         }
     }
@@ -166,10 +175,7 @@ public final class MapleListener implements Listener {
         }
     }
 
-    /**
-     * Pistons must not move maple blocks: the vanilla move recomputes the
-     * landing state with no event we could veto, scrambling the reserved state.
-     */
+    /** Pistons must not move maple blocks. */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPistonExtend(BlockPistonExtendEvent event) {
         for (Block block : event.getBlocks()) {
@@ -190,7 +196,7 @@ public final class MapleListener implements Listener {
         }
     }
 
-    /** Growing trees must not overwrite maple blocks (vanilla trees can replace leaves). */
+    /** Growing trees must not overwrite maple blocks. */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onStructureGrow(StructureGrowEvent event) {
         event.getBlocks().removeIf(state -> MapleType.of(state.getBlock()) != null);
@@ -214,7 +220,6 @@ public final class MapleListener implements Listener {
     }
 
     private void collect(Block block, List<Saved> out) {
-        // Cheap Material pre-check happens inside MapleType.of().
         MapleType type = MapleType.of(block);
         if (type != null) {
             out.add(new Saved(block, type));
@@ -223,9 +228,8 @@ public final class MapleListener implements Listener {
 
     /**
      * Next tick: restore the server-side state if vanilla managed to change it,
-     * and re-send the canonical state to nearby clients — their local
-     * prediction may display a stale state even though the server never
-     * broadcast a change. Deduplicated per tick via {@link #pendingReassert}.
+     * and re-send the canonical state to nearby clients (client-side prediction
+     * can display a stale state the server never broadcast). Dedup per tick.
      */
     private void reassertNextTick(List<Saved> saved) {
         if (saved.isEmpty()) {
@@ -248,7 +252,7 @@ public final class MapleListener implements Listener {
                 if (b.getType() != s.type().host()) {
                     continue; // the block was legitimately removed meanwhile
                 }
-                BlockData canonical = s.type().createData();
+                BlockData canonical = s.type().reservedData(b.getBlockData());
                 if (!b.getBlockData().equals(canonical)) {
                     b.setBlockData(canonical, false);
                 }
@@ -265,7 +269,7 @@ public final class MapleListener implements Listener {
     }
 
     // ------------------------------------------------------------------
-    // INTERACT — axe stripping + server-side placement against note blocks
+    // INTERACT — axe stripping, door half sync, note-block placement fix
     // ------------------------------------------------------------------
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -278,7 +282,21 @@ public final class MapleListener implements Listener {
             return;
         }
         MapleType clickedType = MapleType.of(clicked);
-        if (clickedType == null || !clickedType.isNoteBased()) {
+        if (clickedType == null) {
+            return;
+        }
+
+        // Maple door: vanilla toggles the clicked half's open state (preserving
+        // powered), but with door physics locked the second half no longer
+        // syncs itself — do it manually on the next tick.
+        if (clickedType == MapleType.DOOR) {
+            syncDoorHalvesNextTick(clicked);
+            return;
+        }
+        if (clickedType == MapleType.TRAPDOOR) {
+            return; // single block, vanilla handles everything
+        }
+        if (!clickedType.isNoteBased()) {
             return;
         }
 
@@ -298,7 +316,7 @@ public final class MapleListener implements Listener {
             };
             if (stripped != null) {
                 event.setUseItemInHand(Event.Result.DENY);
-                clicked.setBlockData(stripped.createData(), false);
+                clicked.setBlockData(stripped.reservedData(null), false);
                 clicked.getWorld().playSound(clicked.getLocation().add(0.5, 0.5, 0.5),
                         Sound.ITEM_AXE_STRIP, SoundCategory.BLOCKS, 1.0f, 1.0f);
                 if (player.getGameMode() != GameMode.CREATIVE) {
@@ -327,6 +345,45 @@ public final class MapleListener implements Listener {
         placeManually(player, item, target, clicked, hand);
     }
 
+    /**
+     * One tick after a maple door is used, copy the clicked half's open state
+     * to the other half and keep both halves in the reserved (powered) state.
+     */
+    private void syncDoorHalvesNextTick(Block half) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (half.getType() != Material.WARPED_DOOR
+                    || !(half.getBlockData() instanceof Door door)) {
+                return;
+            }
+            Block other = door.getHalf() == Bisected.Half.BOTTOM
+                    ? half.getRelative(BlockFace.UP)
+                    : half.getRelative(BlockFace.DOWN);
+            if (other.getType() != Material.WARPED_DOOR
+                    || !(other.getBlockData() instanceof Door otherDoor)) {
+                return;
+            }
+            boolean changed = false;
+            if (otherDoor.isOpen() != door.isOpen()) {
+                otherDoor.setOpen(door.isOpen());
+                changed = true;
+            }
+            if (!otherDoor.isPowered()) {
+                otherDoor.setPowered(true);
+                changed = true;
+            }
+            if (changed) {
+                other.setBlockData(otherDoor, false);
+            }
+            // Make sure clients see both halves in the canonical state.
+            for (Block b : new Block[]{half, other}) {
+                Location loc = b.getLocation();
+                for (Player p : b.getWorld().getNearbyPlayers(loc, RESYNC_RADIUS)) {
+                    p.sendBlockChange(loc, b.getBlockData());
+                }
+            }
+        });
+    }
+
     private boolean isOccupied(Block target) {
         return !target.getWorld()
                 .getNearbyEntities(BoundingBox.of(target), entity -> entity instanceof LivingEntity)
@@ -334,20 +391,19 @@ public final class MapleListener implements Listener {
     }
 
     /**
-     * Replicates vanilla block placement: sets the block, fires a regular
-     * BlockPlaceEvent (so protection plugins can veto it and our own PLACE
-     * handler converts maple items), consumes the item and plays the sound.
-     *
-     * Note: orientable vanilla blocks (stairs, logs, furnaces...) placed through
-     * this path get their default orientation — the client does not send aim
-     * data for a click it considers an interaction. Maple blocks themselves are
-     * orientation-free, so they always place perfectly.
+     * Replicates vanilla block placement against note-based maple blocks: sets
+     * the block, fires a regular BlockPlaceEvent (protection-plugin friendly,
+     * and our own PLACE handler converts maple items), consumes the item and
+     * plays the sound. Orientable vanilla blocks get default orientation here —
+     * the client sends no aim data for a click it treats as an interaction.
      */
     private void placeManually(Player player, ItemStack item, Block target, Block against, EquipmentSlot hand) {
         org.bukkit.block.BlockState replaced = target.getState();
 
         MapleType mapleType = items.getMapleType(item);
-        BlockData data = mapleType != null ? mapleType.createData() : item.getType().createBlockData();
+        BlockData data = mapleType != null && mapleType != MapleType.DOOR
+                ? mapleType.reservedData(null)
+                : item.getType().createBlockData();
 
         target.setBlockData(data, true);
 
@@ -381,21 +437,49 @@ public final class MapleListener implements Listener {
         MapleType type = MapleType.of(block);
 
         if (type == null) {
-            // Breaking ANY block can silently retune adjacent maple blocks.
+            // With warped-door physics locked, vanilla half-pair breaking no
+            // longer happens by itself — emulate it for vanilla warped doors.
+            if (block.getType() == Material.WARPED_DOOR
+                    && block.getBlockData() instanceof Door door) {
+                Block other = door.getHalf() == Bisected.Half.BOTTOM
+                        ? block.getRelative(BlockFace.UP)
+                        : block.getRelative(BlockFace.DOWN);
+                if (other.getType() == Material.WARPED_DOOR) {
+                    other.setType(Material.AIR, false);
+                }
+                // Vanilla loot lives on the bottom half; breaking the top half
+                // must still yield the door.
+                if (door.getHalf() == Bisected.Half.TOP
+                        && player.getGameMode() != GameMode.CREATIVE) {
+                    event.setDropItems(false);
+                    dropItem(block, new ItemStack(Material.WARPED_DOOR));
+                }
+            }
             protectNeighbours(block);
             return;
         }
 
-        // Never let the vanilla loot table run (note block / azalea leaves / sticks).
+        // Never let the vanilla loot table run.
         event.setDropItems(false);
         event.setExpToDrop(0);
 
+        if (type == MapleType.DOOR && block.getBlockData() instanceof Door door) {
+            // Remove the second half silently; drop exactly one maple door.
+            Block other = door.getHalf() == Bisected.Half.BOTTOM
+                    ? block.getRelative(BlockFace.UP)
+                    : block.getRelative(BlockFace.DOWN);
+            if (other.getType() == Material.WARPED_DOOR) {
+                other.setType(Material.AIR, false);
+            }
+        }
+
         if (player.getGameMode() != GameMode.CREATIVE) {
-            if (type.isNoteBased()) {
-                // Wooden blocks always drop themselves, whatever the tool — vanilla behaviour.
-                dropItem(block, items.create(type, 1));
-            } else if (isShears(player.getInventory().getItemInMainHand())) {
-                // Leaves drop themselves ONLY when cut with shears — vanilla behaviour.
+            if (type == MapleType.LEAVES) {
+                if (isShears(player.getInventory().getItemInMainHand())) {
+                    dropItem(block, items.create(type, 1));
+                }
+            } else {
+                // Wooden blocks always drop themselves, whatever the tool.
                 dropItem(block, items.create(type, 1));
             }
         }
@@ -426,13 +510,27 @@ public final class MapleListener implements Listener {
                 continue;
             }
             iterator.remove();
+
+            if (type == MapleType.DOOR) {
+                boolean bottom = block.getBlockData() instanceof Door door
+                        && door.getHalf() == Bisected.Half.BOTTOM;
+                Block other = bottom ? block.getRelative(BlockFace.UP) : block.getRelative(BlockFace.DOWN);
+                block.setType(Material.AIR, false);
+                if (other.getType() == Material.WARPED_DOOR) {
+                    other.setType(Material.AIR, false);
+                }
+                if (bottom || MapleType.of(other) == null) {
+                    dropItem(block, items.create(MapleType.DOOR, 1));
+                }
+                continue;
+            }
+
             block.setType(Material.AIR, false);
-            if (type.isNoteBased()) {
+            if (type != MapleType.LEAVES) {
                 dropItem(block, items.create(type, 1));
             }
             // Leaves destroyed by an explosion drop nothing — vanilla behaviour.
         }
-        // Protect maple blocks bordering ANY destroyed block.
         for (Block block : touched) {
             protectNeighbours(block);
         }
